@@ -1,5 +1,7 @@
 package rest;
 
+import java.util.Iterator;
+
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Consumes;
@@ -27,17 +29,14 @@ import com.hp.hpl.jena.rdf.model.Model;
 import com.hp.hpl.jena.rdf.model.RDFNode;
 import com.hp.hpl.jena.tdb.TDBFactory;  
 import com.hp.hpl.jena.util.FileManager;
+import com.hp.hpl.jena.vocabulary.RDFS;
+
+import dao.VocabularyDAO;
 
 @Path("/vocabulary")
 public class VocabularyAPI {
-	
-	/**
-	 * Insert Vocabulary
-	 * 
-	 * @param data
-	 * @return
-	 * @throws Exception
-	 */
+	//add vocabulary
+	@Path("/add")
 	@POST
 	@Consumes({MediaType.APPLICATION_FORM_URLENCODED,MediaType.APPLICATION_JSON})
 	@Produces(MediaType.APPLICATION_JSON)
@@ -46,22 +45,18 @@ public class VocabularyAPI {
 		String returnString = null;
 		JSONArray jsonArray = new JSONArray();
 		JSONObject jsonObject = new JSONObject();
+		VocabularyDAO dao = new VocabularyDAO();
 		
 		try {
 			
 			JSONObject partsData = new JSONObject(data);
 			System.out.println( "jsonData: " + partsData.toString() );
 			
-			Dataset ds = TDBFactory.createDataset("VocabularyDataSet");
-			Model model = ds.getDefaultModel();
-			FileManager.get().readModel(model, "http://xmlns.com/foaf/spec/index.rdf");
+			int httpcode = dao.insertVocabulary(partsData.optString("name"), partsData.optString("uri"));
 			
-			model.commit();
-			model.close();
-			ds.close(); 
-			
-			if( true ) {
+			if( httpcode == 200 ) {
 				jsonObject.put("HTTP_CODE", "200");
+				jsonObject.put("Message", "Vocabulary has been added successfully");
 
 				returnString = jsonArray.put(jsonObject).toString();
 			} else {
@@ -78,89 +73,120 @@ public class VocabularyAPI {
 		return Response.ok(returnString).build();
 	}
 	
+	//get a list of vocabulary name
 	@GET
 	@Produces(MediaType.APPLICATION_JSON)
-	public Response returnBrandParts(
-				@QueryParam("queryStr") String queryStr)
+	public Response returnAllVocabulary() throws Exception {
+		
+		String returnString = null;
+		Response rb = null;	
+		JSONArray json = new JSONArray();
+		
+		try {
+			
+			VocabularyDAO dao = new VocabularyDAO();
+			
+			Iterator<String> it = dao.getAllVocabularyName();
+			
+			returnString = json.toString();
+			
+			rb = Response.ok(returnString).build();
+			
+		}
+		catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		return rb;
+	}
+	
+	//search vocabulary based on keyword
+	@Path("/search")
+	@GET
+	@Produces(MediaType.APPLICATION_JSON)
+	public Response searchVocabulary(
+				@QueryParam("keyword") String keyword)
 				throws Exception {
 		
 		String returnString = null;
 		JSONArray json = new JSONArray();
 		
 		try {
+			VocabularyDAO dao = new VocabularyDAO();
 			
-			if(queryStr == null) {
-				return Response.status(400).entity("Error: please specify query for this search").build();
-			}
-			
-			TextQuery.init();
-			
-	        // Base data
-			Dataset ds1 = TDBFactory.createDataset("VocabularyDataSet");
-			//Dataset ds1 = DatasetFactory.createMem() ;
-
-	        // Define the index mapping 
-	        EntityDefinition entDef = new EntityDefinition("uri", "text", RDFS.label.asNode()) ;
-
-	        // Lucene, in memory.
-	        Directory dir =  new RAMDirectory();
-	        
-	        // Join together into a dataset
-	        Dataset ds = TextDatasetFactory.createLucene(ds1, dir, entDef, null) ;
-	        
-			
-			//Dataset ds = DatasetFactory.assemble("text-config.ttl", "C:\\Users\\yexl\\Test\\test\\VocabularyDataSet") ;
-			
-	        Model model;
-	        
-	        ds.begin(ReadWrite.WRITE) ;
-	        try {
-	        	model = ds.getDefaultModel();
-	    		//FileManager.get().readModel(model, "http://xmlns.com/foaf/spec/index.rdf");
-	    		//FileManager.get().readModel(model, "http://dublincore.org/2012/06/14/dcterms.rdf");
-	            ds.commit() ;
-	        } finally { ds.end() ; }
-
-			ResultSet res;
-			
-			String pre = StrUtils.strjoinNL
-		            ("PREFIX text: <http://jena.apache.org/text#>"
-		            , "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>"
-		            , "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>") ;
-			
-			String qs = StrUtils.strjoinNL
-		            ( "SELECT * "
-		            , " { ?s text:query ('sdfsdafsd') "
-		            , " }") ;
-			
-			//String qs = StrUtils.strjoinNL
-	        //( "SELECT ?s "
-	        //, " { ?s ?a ?b "
-	        //, " }") ;
-			
-			ds.begin(ReadWrite.READ) ;
-			Query q = QueryFactory.create(pre+"\n"+qs) ;
-			QueryExecution qe = QueryExecutionFactory.create(q, model);
-			try {
-				res = qe.execSelect();
-				while( res.hasNext()) {
-					QuerySolution soln = res.next();
-					Iterator<String> str = soln.varNames();
-					RDFNode a = soln.get("?s");
-					System.out.println(" " + a);
-				}
-			} finally {
-				qe.close();
-			}
-			
-			ds.end();
-					
-			ds.close(); 
+			Iterator<String> it = dao.searchVocabulary(keyword);
 			
 			returnString = json.toString();
-			
 		}
 		catch (Exception e) {
+			e.printStackTrace();
+			return Response.status(500).entity("Server was not able to process your request").build();
+		}
+		
+		return Response.ok(returnString).build();
+	}
+	
+	//delete vocabulary based on vocabulary name
+	@Path("/delete/{name}")
+	@DELETE
+	@Consumes({MediaType.APPLICATION_FORM_URLENCODED,MediaType.APPLICATION_JSON})
+	@Produces(MediaType.APPLICATION_JSON)
+	public Response deleteVocabulary(@PathParam("name") String name,
+									String incomingData) 
+								throws Exception {
+		
+		int http_code;
+		String returnString = null;
+		JSONArray jsonArray = new JSONArray();
+		JSONObject jsonObject = new JSONObject();
+		VocabularyDAO dao = new VocabularyDAO();
+		
+		try {			
+			JSONObject partsData = new JSONObject(incomingData);
+			
+			http_code = dao.deleteVocabulary(name);
+			
+			if(http_code == 200) {
+				jsonObject.put("HTTP_CODE", "200");
+				jsonObject.put("MSG", "Vocabulary has been deleted successfully");
+			} else {
+				return Response.status(500).entity("Server was not able to process your request").build();
+			}
+			
+			returnString = jsonArray.put(jsonObject).toString();
+			
+		} catch(Exception e) {
+			e.printStackTrace();
+			return Response.status(500).entity("Server was not able to process your request").build();
+		}
+		
+		return Response.ok(returnString).build();
+	}
+	
+	//update vocabulary with a new uri
+	@POST
+	@Consumes({MediaType.APPLICATION_FORM_URLENCODED,MediaType.APPLICATION_JSON})
+	@Produces(MediaType.APPLICATION_JSON)
+	public Response updateVocabulary(String incomingData) throws Exception {
+		
+		String returnString = null;
+		VocabularyDAO dao = new VocabularyDAO();
+		
+		try {
+			System.out.println("incomingData: " + incomingData);
+			
+			JSONObject partsData = new JSONObject(incomingData);
+			System.out.println( "jsonData: " + partsData.toString() );
+			
+			int http_code = dao.updataVocabulary(partsData.optString("name"), partsData.optString("uri"));
+			
+			if( http_code == 200 ) {
+				returnString = "data updated";
+			} else {
+				return Response.status(500).entity("Unable to process Item").build();
+			}
+			
+		} catch (Exception e) {
 			e.printStackTrace();
 			return Response.status(500).entity("Server was not able to process your request").build();
 		}
