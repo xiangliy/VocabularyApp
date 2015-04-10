@@ -2,12 +2,15 @@ package dao;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.jena.atlas.lib.StrUtils;
 import org.apache.jena.query.text.EntityDefinition;
 import org.apache.jena.query.text.TextDatasetFactory;
+import org.apache.jena.query.text.TextQuery;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 
@@ -21,8 +24,8 @@ import com.hp.hpl.jena.query.ResultSet;
 import com.hp.hpl.jena.rdf.model.Model;
 import com.hp.hpl.jena.rdf.model.ModelFactory;
 import com.hp.hpl.jena.rdf.model.RDFNode;
+import com.hp.hpl.jena.rdf.model.Resource;
 import com.hp.hpl.jena.tdb.TDBFactory;
-import com.hp.hpl.jena.util.FileManager;
 import com.hp.hpl.jena.vocabulary.RDFS;
 
 public class VocabularyDAO {
@@ -30,49 +33,55 @@ public class VocabularyDAO {
 	private static Dataset dataset = null;
 	
 	// get a dataset with lucene index, lucene index is used for search.
-	private static Dataset getDataset() throws Exception {
+	private static Dataset getDataset(boolean addLuceneIndex) throws Exception {
 		
 		if (dataset != null){
 			return dataset;
 		}
-		
+		 	
+		TextQuery.init();
+			
 		Dataset datasetPrev = TDBFactory.createDataset("C:\\VocabDataset");
-		
-        // Define the index mapping 
-        EntityDefinition entDef = new EntityDefinition("uri", "text", RDFS.label.asNode());
-        
-        Directory dir = null;
+			
+	    // Define the index mapping 
+	    EntityDefinition entDef = new EntityDefinition("uri", "text", RDFS.label.asNode());
+	        
+	    Directory dir = null;
 
-        try{
-	        // Lucene, index file
-	        dir =   FSDirectory.open(new File("index-directory"));
-        }
-        catch(Exception e){
-        	
-        }
-		
-        // Join together into a dataset
-        Dataset dataset = TextDatasetFactory.createLucene(datasetPrev, dir, entDef, null) ;
-		
+	    try{
+		    // Lucene, index file
+		    dir =   FSDirectory.open(new File("index-directory"));
+	    }
+	    catch(Exception e){
+	        	
+	    }
+			
+	    // Join together into a dataset
+	    dataset = TextDatasetFactory.createLucene(datasetPrev, dir, entDef, null) ;
+
 		return dataset;
 	}
 	
 	// add new vocabulary
-	public int insertVocabulary(String name, String uri) throws Exception{
+	public int insertVocabulary(String name, String prefix, String location) throws Exception{
 		
 		if (name.isEmpty() ){
 			return 500;
 		}
 		
-		if (uri.isEmpty()){
+		if (location.isEmpty()){
 			return 500;
 		}
 		
-		Dataset dataset = getDataset();
+		if (prefix.isEmpty()){
+			return 500;
+		}
+		
+		Dataset dataset = getDataset(true);
 		
 		Model model = ModelFactory.createDefaultModel();
-		FileManager.get().readModel( model, uri, "RDF/XML" );
-		dataset.addNamedModel(name, model);
+		com.hp.hpl.jena.util.FileManager.get().readModel( model, location, "RDF/XML" );
+		dataset.addNamedModel(name + "<>" + prefix, model);
 		
 		model.close();
 		
@@ -86,7 +95,7 @@ public class VocabularyDAO {
 			return 500;
 		}
 		
-		Dataset dataset = getDataset();
+		Dataset dataset = getDataset(false);
 		
 		if (dataset.containsNamedModel(name)){
 			dataset.removeNamedModel(name);	
@@ -106,11 +115,11 @@ public class VocabularyDAO {
 			return 500;
 		}
 		
-		Dataset dataset = getDataset();
+		Dataset dataset = getDataset(false);
 		
 		if (dataset.containsNamedModel(name)){
 			Model model = ModelFactory.createDefaultModel();
-			FileManager.get().readModel( model, newUri, "RDF/XML" );
+			com.hp.hpl.jena.util.FileManager.get().readModel( model, newUri, "RDF/XML" );
 			
 			dataset.replaceNamedModel(name, model);
 		}
@@ -123,7 +132,18 @@ public class VocabularyDAO {
 		
 		List<String> resultList = new ArrayList<String>();
 		
-		Dataset dataset = getDataset();
+		Dataset dataset = getDataset(false);
+		
+		Iterator<String> names = dataset.listNames();
+		Map<String, String> strmap = new HashMap<String, String>();
+		
+		while(names.hasNext()){
+			String name = names.next();
+			String[] strs = name.split("<>");
+			if (strs.length > 1){
+				strmap.put(strs[1], strs[0]);
+			}
+		}
 		
 		ResultSet res;
 		
@@ -134,8 +154,8 @@ public class VocabularyDAO {
 		
 		String qs = StrUtils.strjoinNL
 	            ( "SELECT DISTINCT ?s "
-	            , "{ { ?s text:query ('*f*') }"
-	            , "UNION { GRAPH ?g { ?s text:query ('*f*') } }} ") ;
+	            , "{ { ?s text:query ('*" + keyword + "*') }"
+	            , "UNION { GRAPH ?g { ?s text:query ('*" + keyword + "*') } }} ") ;
 		
 		//qs = StrUtils.strjoinNL( "SELECT *{ { ?s ?p ?o } UNION { GRAPH ?g { ?s ?p ?o } }}") ;
         
@@ -146,9 +166,17 @@ public class VocabularyDAO {
 			res = qe.execSelect();
 			while( res.hasNext()) {
 				QuerySolution soln = res.next();
-				//Iterator<String> str = soln.varNames();
+				Iterator<String> str = soln.varNames();
 				RDFNode a = soln.get("?s");
-				resultList.add(a.toString());
+				Resource r = a.asResource();
+				String s = r.getLocalName();
+				String  s1 = r.getNameSpace();
+				
+				String s3 = strmap.get(s1);
+				
+				String s4 = s3 + ":" + s;
+				
+				resultList.add(s4);
 			}
 			
 			return resultList.iterator();
@@ -160,8 +188,10 @@ public class VocabularyDAO {
 	//get a list of vocabulary name
 	public Iterator<String> getAllVocabularyName() throws Exception{
 		
-		Dataset dataset = getDataset();
+		Dataset dataset = getDataset(false);
 		
-		return dataset.listNames();
+		Iterator<String> it = dataset.listNames();
+		
+		return it;
 	}
 }

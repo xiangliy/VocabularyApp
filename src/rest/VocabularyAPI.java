@@ -7,7 +7,6 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.POST;
-import javax.ws.rs.PUT;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
@@ -15,21 +14,8 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 import org.codehaus.jettison.json.JSONArray;
+import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
-
-import com.hp.hpl.jena.query.Dataset;  
-import com.hp.hpl.jena.query.Query;
-import com.hp.hpl.jena.query.QueryExecution;
-import com.hp.hpl.jena.query.QueryExecutionFactory;
-import com.hp.hpl.jena.query.QueryFactory;
-import com.hp.hpl.jena.query.QuerySolution;
-import com.hp.hpl.jena.query.ReadWrite;
-import com.hp.hpl.jena.query.ResultSet;
-import com.hp.hpl.jena.rdf.model.Model;  
-import com.hp.hpl.jena.rdf.model.RDFNode;
-import com.hp.hpl.jena.tdb.TDBFactory;  
-import com.hp.hpl.jena.util.FileManager;
-import com.hp.hpl.jena.vocabulary.RDFS;
 
 import dao.VocabularyDAO;
 
@@ -43,7 +29,6 @@ public class VocabularyAPI {
 	public Response addVocabulary(String data) throws Exception {
 		
 		String returnString = null;
-		JSONArray jsonArray = new JSONArray();
 		JSONObject jsonObject = new JSONObject();
 		VocabularyDAO dao = new VocabularyDAO();
 		
@@ -52,13 +37,13 @@ public class VocabularyAPI {
 			JSONObject partsData = new JSONObject(data);
 			System.out.println( "jsonData: " + partsData.toString() );
 			
-			int httpcode = dao.insertVocabulary(partsData.optString("name"), partsData.optString("uri"));
+			int httpcode = dao.insertVocabulary(partsData.optString("name"), partsData.optString("prefix"), partsData.optString("location"));
 			
 			if( httpcode == 200 ) {
 				jsonObject.put("HTTP_CODE", "200");
 				jsonObject.put("Message", "Vocabulary has been added successfully");
 
-				returnString = jsonArray.put(jsonObject).toString();
+				returnString = jsonObject.toString();
 			} else {
 				return Response.status(500).entity("Unable to enter Item").build();
 			}
@@ -74,6 +59,7 @@ public class VocabularyAPI {
 	}
 	
 	//get a list of vocabulary name
+	@Path("/getAllVocabulary")
 	@GET
 	@Produces(MediaType.APPLICATION_JSON)
 	public Response returnAllVocabulary() throws Exception {
@@ -81,6 +67,7 @@ public class VocabularyAPI {
 		String returnString = null;
 		Response rb = null;	
 		JSONArray json = new JSONArray();
+		JSONObject jsonObject = new JSONObject();
 		
 		try {
 			
@@ -88,7 +75,13 @@ public class VocabularyAPI {
 			
 			Iterator<String> it = dao.getAllVocabularyName();
 			
-			returnString = json.toString();
+			json = getJsonFromObject(it);
+			
+			jsonObject.put("result", json);
+			jsonObject.put("HTTP_CODE", "200");
+			jsonObject.put("Message", "Get Vocabulary successfully");
+			
+			returnString = jsonObject.toString();
 			
 			rb = Response.ok(returnString).build();
 			
@@ -101,22 +94,28 @@ public class VocabularyAPI {
 	}
 	
 	//search vocabulary based on keyword
-	@Path("/search")
+	@Path("/search/{keyword}")
 	@GET
 	@Produces(MediaType.APPLICATION_JSON)
 	public Response searchVocabulary(
-				@QueryParam("keyword") String keyword)
+				@PathParam("keyword") String keyword)
 				throws Exception {
 		
 		String returnString = null;
 		JSONArray json = new JSONArray();
+		JSONObject jsonObject = new JSONObject();
 		
 		try {
 			VocabularyDAO dao = new VocabularyDAO();
 			
 			Iterator<String> it = dao.searchVocabulary(keyword);
 			
-			returnString = json.toString();
+			json = getJsonFromObject(it);
+			
+			jsonObject.put("result", json);
+			jsonObject.put("HTTP_CODE", "200");
+			
+			returnString = jsonObject.toString();
 		}
 		catch (Exception e) {
 			e.printStackTrace();
@@ -131,19 +130,15 @@ public class VocabularyAPI {
 	@DELETE
 	@Consumes({MediaType.APPLICATION_FORM_URLENCODED,MediaType.APPLICATION_JSON})
 	@Produces(MediaType.APPLICATION_JSON)
-	public Response deleteVocabulary(@PathParam("name") String name,
-									String incomingData) 
+	public Response deleteVocabulary(@PathParam("name") String name) 
 								throws Exception {
 		
 		int http_code;
 		String returnString = null;
-		JSONArray jsonArray = new JSONArray();
 		JSONObject jsonObject = new JSONObject();
 		VocabularyDAO dao = new VocabularyDAO();
 		
 		try {			
-			JSONObject partsData = new JSONObject(incomingData);
-			
 			http_code = dao.deleteVocabulary(name);
 			
 			if(http_code == 200) {
@@ -153,7 +148,7 @@ public class VocabularyAPI {
 				return Response.status(500).entity("Server was not able to process your request").build();
 			}
 			
-			returnString = jsonArray.put(jsonObject).toString();
+			returnString = jsonObject.toString();
 			
 		} catch(Exception e) {
 			e.printStackTrace();
@@ -192,6 +187,26 @@ public class VocabularyAPI {
 		}
 		
 		return Response.ok(returnString).build();
+	}
+	
+	private JSONArray getJsonFromObject(Iterator<String> it) throws JSONException
+	{
+	    JSONArray jsonArray = new JSONArray();
+	    
+	    while (it.hasNext()){
+	    	String vocabulary = it.next();
+	    	JSONObject formDetailsJson = new JSONObject();
+	    	String[] strs = vocabulary.split("<>");
+	    	
+
+			if (strs.length > 1){
+				formDetailsJson.put("name", strs[0]);
+				formDetailsJson.put("value", vocabulary);
+				jsonArray.put(formDetailsJson).toString();
+			}
+	    }
+	    
+	    return jsonArray;
 	}
 }
 
