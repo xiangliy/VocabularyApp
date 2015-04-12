@@ -12,10 +12,10 @@
         		<form>
           			<div class="form-group">
           				<div class="col-sm-9">
-            				<input type="text" ng-model="keyword" class="form-control" placeholder="Search">
+            				<input type="text" class="form-control" placeholder="Search" ng-model="searchvalue.keyword"/>
           				</div>
           
-		            	<button type="button" class="btn btn-default" ng-click="search(keyword)">
+		            	<button type="button" class="btn btn-default" ng-click="search(searchvalue.keyword)">
 		  					<span class="glyphicon glyphicon-search"></span>
 				  		</button>
 				  		<button type="button" class="btn btn-default" ng-click="switchToManageDialog()">
@@ -26,8 +26,8 @@
 					  	<br/>
 					  	<table ng-table="searchTableParams" class="table">
 			    			<tr ng-repeat="user in $data">
-			        			<td data-title="'Name'">{{user.name}}</td>
-			        			<td><span ng-click="addResult(user.name)" class="glyphicon glyphicon-plus"></span></td>
+			        			<td data-title="Result">{{user.value}}</td>
+			        			<td><span ng-click="addResult(user.value)" class="glyphicon glyphicon-plus"></span></td>
 			    			</tr>
 			    		</table>
           			</div>
@@ -60,7 +60,7 @@
 					  	<br/>
 					  	<table ng-table="manageTableParams" class="table">
 			    			<tr ng-repeat="user in $data">
-			        			<td data-title="'Name'">{{user.name}}</td>
+			        			<td data-title="Vocabulary">{{user.name}}</td>
 			        			<td><span ng-click="deleteItem(user.value)" class="glyphicon glyphicon-remove"></span></td>
 			    			</tr>
 			    		</table>

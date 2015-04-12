@@ -20,12 +20,14 @@ import com.hp.hpl.jena.query.QueryExecution;
 import com.hp.hpl.jena.query.QueryExecutionFactory;
 import com.hp.hpl.jena.query.QueryFactory;
 import com.hp.hpl.jena.query.QuerySolution;
+import com.hp.hpl.jena.query.ReadWrite;
 import com.hp.hpl.jena.query.ResultSet;
 import com.hp.hpl.jena.rdf.model.Model;
 import com.hp.hpl.jena.rdf.model.ModelFactory;
 import com.hp.hpl.jena.rdf.model.RDFNode;
 import com.hp.hpl.jena.rdf.model.Resource;
 import com.hp.hpl.jena.tdb.TDBFactory;
+import com.hp.hpl.jena.util.FileManager;
 import com.hp.hpl.jena.vocabulary.RDFS;
 
 public class VocabularyDAO {
@@ -35,9 +37,9 @@ public class VocabularyDAO {
 	// get a dataset with lucene index, lucene index is used for search.
 	private static Dataset getDataset(boolean addLuceneIndex) throws Exception {
 		
-		if (dataset != null){
-			return dataset;
-		}
+		//if (dataset != null){
+		//	return dataset;
+		//}
 		 	
 		TextQuery.init();
 			
@@ -80,8 +82,14 @@ public class VocabularyDAO {
 		Dataset dataset = getDataset(true);
 		
 		Model model = ModelFactory.createDefaultModel();
-		com.hp.hpl.jena.util.FileManager.get().readModel( model, location, "RDF/XML" );
+		FileManager.get().readModel( model, location, "RDF/XML" );
+		dataset.begin(ReadWrite.WRITE);
+		
 		dataset.addNamedModel(name + "<>" + prefix, model);
+		
+		dataset.commit();
+		dataset.end();
+		dataset.close();
 		
 		model.close();
 		
@@ -97,9 +105,16 @@ public class VocabularyDAO {
 		
 		Dataset dataset = getDataset(false);
 		
+		dataset.begin(ReadWrite.WRITE);
+		
 		if (dataset.containsNamedModel(name)){
 			dataset.removeNamedModel(name);	
 		}
+		
+		dataset.commit();
+		dataset.end();
+		dataset.close();
+
 		
 		return 200;
 	}
@@ -117,6 +132,8 @@ public class VocabularyDAO {
 		
 		Dataset dataset = getDataset(false);
 		
+		dataset.begin(ReadWrite.WRITE);
+		
 		if (dataset.containsNamedModel(name)){
 			Model model = ModelFactory.createDefaultModel();
 			com.hp.hpl.jena.util.FileManager.get().readModel( model, newUri, "RDF/XML" );
@@ -124,6 +141,10 @@ public class VocabularyDAO {
 			dataset.replaceNamedModel(name, model);
 		}
 		
+		dataset.commit();
+		dataset.end();
+		dataset.close();
+
 		return 200;
 	}
 	
@@ -133,6 +154,8 @@ public class VocabularyDAO {
 		List<String> resultList = new ArrayList<String>();
 		
 		Dataset dataset = getDataset(false);
+		
+		dataset.begin(ReadWrite.READ);
 		
 		Iterator<String> names = dataset.listNames();
 		Map<String, String> strmap = new HashMap<String, String>();
@@ -146,7 +169,7 @@ public class VocabularyDAO {
 		}
 		
 		ResultSet res;
-		
+
 		String pre = StrUtils.strjoinNL
 	            ("PREFIX text: <http://jena.apache.org/text#>"
 	            , "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>"
@@ -166,32 +189,36 @@ public class VocabularyDAO {
 			res = qe.execSelect();
 			while( res.hasNext()) {
 				QuerySolution soln = res.next();
-				Iterator<String> str = soln.varNames();
 				RDFNode a = soln.get("?s");
-				Resource r = a.asResource();
-				String s = r.getLocalName();
-				String  s1 = r.getNameSpace();
 				
-				String s3 = strmap.get(s1);
-				
-				String s4 = s3 + ":" + s;
-				
-				resultList.add(s4);
+				resultList.add(strmap.get(a.asResource().getNameSpace()) + ":" + a.asResource().getLocalName());
 			}
-			
-			return resultList.iterator();
 		} finally {
 			qe.close();
 		}
+		
+		dataset.commit();
+		dataset.end();
+		dataset.close();
+		
+		return resultList.iterator();
 	}
 	
 	//get a list of vocabulary name
 	public Iterator<String> getAllVocabularyName() throws Exception{
 		
 		Dataset dataset = getDataset(false);
+		Iterator<String> it;
 		
-		Iterator<String> it = dataset.listNames();
+		dataset.begin(ReadWrite.READ);
 		
+		try {
+			 it = dataset.listNames();
+			 dataset.commit() ;
+	    } finally { dataset.end() ; }
+		
+		dataset.close();
+
 		return it;
 	}
 }

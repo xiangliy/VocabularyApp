@@ -35,7 +35,6 @@ public class VocabularyAPI {
 		try {
 			
 			JSONObject partsData = new JSONObject(data);
-			System.out.println( "jsonData: " + partsData.toString() );
 			
 			int httpcode = dao.insertVocabulary(partsData.optString("name"), partsData.optString("prefix"), partsData.optString("location"));
 			
@@ -75,7 +74,7 @@ public class VocabularyAPI {
 			
 			Iterator<String> it = dao.getAllVocabularyName();
 			
-			json = getJsonFromObject(it);
+			json = getJsonFromObject(it, false);
 			
 			jsonObject.put("result", json);
 			jsonObject.put("HTTP_CODE", "200");
@@ -110,7 +109,7 @@ public class VocabularyAPI {
 			
 			Iterator<String> it = dao.searchVocabulary(keyword);
 			
-			json = getJsonFromObject(it);
+			json = getJsonFromObject(it, true);
 			
 			jsonObject.put("result", json);
 			jsonObject.put("HTTP_CODE", "200");
@@ -126,12 +125,11 @@ public class VocabularyAPI {
 	}
 	
 	//delete vocabulary based on vocabulary name
-	@Path("/delete/{name}")
-	@DELETE
+	@Path("/delete")
+	@POST
 	@Consumes({MediaType.APPLICATION_FORM_URLENCODED,MediaType.APPLICATION_JSON})
 	@Produces(MediaType.APPLICATION_JSON)
-	public Response deleteVocabulary(@PathParam("name") String name) 
-								throws Exception {
+	public Response deleteVocabulary(String data) throws Exception {
 		
 		int http_code;
 		String returnString = null;
@@ -139,7 +137,9 @@ public class VocabularyAPI {
 		VocabularyDAO dao = new VocabularyDAO();
 		
 		try {			
-			http_code = dao.deleteVocabulary(name);
+			JSONObject partsData = new JSONObject(data);
+			
+			http_code = dao.deleteVocabulary(partsData.optString("value"));
 			
 			if(http_code == 200) {
 				jsonObject.put("HTTP_CODE", "200");
@@ -189,21 +189,28 @@ public class VocabularyAPI {
 		return Response.ok(returnString).build();
 	}
 	
-	private JSONArray getJsonFromObject(Iterator<String> it) throws JSONException
+	private JSONArray getJsonFromObject(Iterator<String> it, boolean bSearch) throws JSONException
 	{
 	    JSONArray jsonArray = new JSONArray();
 	    
 	    while (it.hasNext()){
 	    	String vocabulary = it.next();
 	    	JSONObject formDetailsJson = new JSONObject();
-	    	String[] strs = vocabulary.split("<>");
 	    	
-
-			if (strs.length > 1){
-				formDetailsJson.put("name", strs[0]);
+	    	if (bSearch == false)
+	    	{
+	    		String[] strs = vocabulary.split("<>");
+				if (strs.length > 1){
+					formDetailsJson.put("name", strs[0]);
+					formDetailsJson.put("value", vocabulary);
+					jsonArray.put(formDetailsJson).toString();
+				}
+	    	}
+	    	else
+	    	{
 				formDetailsJson.put("value", vocabulary);
 				jsonArray.put(formDetailsJson).toString();
-			}
+	    	}
 	    }
 	    
 	    return jsonArray;

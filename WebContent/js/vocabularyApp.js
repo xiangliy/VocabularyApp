@@ -3,59 +3,64 @@
  */
 app.controller('SearchController', function ($scope, $http, $resource, ngTableParams) {
 	
+	var keywordscope;
+	
 	$scope.search = function(keyword) {
-        var Vocabulary = $resource('/ManageVocabulary/api/vocabulary/search/'+ keyword);
-        Vocabulary.get({}, function(response){
-        	if(response.HTTP_CODE == 200){
-        		data = response.result;
+		keywordscope = keyword;
+		$scope.searchTableParams.reload();
+	};
+
         		
-        		for (var i=VocabularCollection.length-1; i>=0; i--) {
-        		    $scope.searchTableParams = new ngTableParams({
-        		        page: 1,            
-        		        count: 10           
-        		    }, {
-        		        total: data.length, 
-        		        getData: function($defer, params) {
-        		            $defer.resolve(data.slice((params.page() - 1) * params.count(), params.page() * params.count()));
-        		        }
-        		    });
-        		}
-        		
-        		$scope.manageTableParams.reload();
-        	}
-		}); 
-    };
+	$scope.searchTableParams = new ngTableParams({
+		page: 1,            
+		count: 10           
+	}, {
+		total: 0, 
+		getData: function($defer, params) {
+			var Vocabulary = $resource('/ManageVocabulary/api/vocabulary/search/' + keywordscope);
+			Vocabulary.get({}, function(response){
+				if(response.HTTP_CODE == 200){
+					ResultCollection = response.result;
+					params.total(ResultCollection.length);
+					
+					$defer.resolve(ResultCollection.slice((params.page() - 1) * params.count(), params.page() * params.count()));
+				}
+			});
+		}
+	});
+
+    
     
     $scope.addResult = function(userName) {
-    	$scope.resultValue = userName;
+    	this.searchvalue.keyword = userName;
     };
     
     var VocabularCollection;
     
-    $scope.switchToManageDialog = function() {
+	$scope.switchToManageDialog = function() {	
     	$scope.selection = "manageDialog";
-    	
-        var Vocabulary = $resource('/ManageVocabulary/api/vocabulary/getAllVocabulary');
-        Vocabulary.get({}, function(response){
-			if(response.HTTP_CODE == 200){
-				VocabularCollection = response.result;
-
-			    $scope.manageTableParams = new ngTableParams({
-			        page: 1,            
-			        count: 10           
-			    }, {
-			        total: VocabularCollection.length, 
-			        getData: function($defer, params) {
-			            $defer.resolve(VocabularCollection.slice((params.page() - 1) * params.count(), params.page() * params.count()));
-			        }
-			    });
-				
-			}
-			else{
-				alert("error");
-			}
-		});    
-    }
+    	$scope.manageTableParams.reload();
+	}
+	
+    $scope.manageTableParams = new ngTableParams({
+    	page: 1,            
+    	count: 10           
+    }, {
+    	total: 0, 
+    	getData: function($defer, params) {
+    		var Vocabulary = $resource('/ManageVocabulary/api/vocabulary/getAllVocabulary');
+    		Vocabulary.get({}, function(response){
+    			if(response.HTTP_CODE == 200){
+    				VocabularCollection = response.result;
+    				params.total(VocabularCollection.length);
+    				$defer.resolve(VocabularCollection.slice((params.page() - 1) * params.count(), params.page() * params.count()));
+    			}
+    			else{
+    				alert("error");
+    			}
+    		})
+    	}
+    });
     
     $scope.switchToSearchDialog = function() {
     	$scope.selection = "searchDialog";
@@ -66,8 +71,8 @@ app.controller('SearchController', function ($scope, $http, $resource, ngTablePa
     }
     
     $scope.deleteItem = function(userName) {
-        var Vocabulary = $resource('/ManageVocabulary/api/vocabulary/delete/'+ userName);
-        Vocabulary.remove({}, function(response){
+        var Vocabulary = $resource('/ManageVocabulary/api/vocabulary/delete/');
+        Vocabulary.save({value:userName}, function(response){
         	if(response.HTTP_CODE == 200){
         		for (var i=VocabularCollection.length-1; i>=0; i--) {
         		    if (VocabularCollection[i].name === userName) {

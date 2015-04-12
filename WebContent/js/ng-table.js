@@ -573,7 +573,7 @@ function($scope, NgTableParams, $timeout, $parse, $compile, $attrs, $element, ng
     this.compileDirectiveTemplates = function () {
         if (!$element.hasClass('ng-table')) {
             $scope.templates = {
-                //header: ($attrs.templateHeader ? $attrs.templateHeader : 'ng-table/header.html'),
+                header: ($attrs.templateHeader ? $attrs.templateHeader : 'ng-table/header.html'),
                 pagination: ($attrs.templatePagination ? $attrs.templatePagination : 'ng-table/pager.html')
             };
             $element.addClass('ng-table');
