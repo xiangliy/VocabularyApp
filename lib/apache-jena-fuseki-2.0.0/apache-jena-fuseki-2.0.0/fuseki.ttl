@@ -1,0 +1,70 @@
+@prefix rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix tdb:     <http://jena.hpl.hp.com/2008/tdb#> .
+@prefix ja:      <http://jena.hpl.hp.com/2005/11/Assembler#> .
+@prefix text:    <http://jena.apache.org/text#> .
+@prefix fuseki:  <http://jena.apache.org/fuseki#> .
+@prefix foaf:    <http://xmlns.com/foaf/0.1/> .
+@prefix :        <http://localhost/dbpedia37#> .
+
+[] rdf:type fuseki:Server ;
+   fuseki:services (
+     :service_text_tdb
+   ) .
+
+## Example of a TDB dataset and text index
+## Initialize TDB
+[] ja:loadClass "com.hp.hpl.jena.tdb.TDB" .
+tdb:DatasetTDB  rdfs:subClassOf  ja:RDFDataset .
+tdb:GraphTDB    rdfs:subClassOf  ja:Model .
+
+## Initialize text query
+[] ja:loadClass       "org.apache.jena.query.text.TextQuery" .
+# A TextDataset is a regular dataset with a text index.
+text:TextDataset      rdfs:subClassOf   ja:RDFDataset .
+# Lucene index
+text:TextIndexLucene  rdfs:subClassOf   text:TextIndex .
+
+## ---------------------------------------------------------------
+## This URI must be fixed - it's used to assemble the text dataset.
+
+:text_dataset rdf:type     text:TextDataset ;
+    text:dataset   :dataset ;
+    text:index     :indexLucene ;
+    .
+
+# A TDB datset used for RDF storage
+:dataset rdf:type      tdb:DatasetTDB ;
+    tdb:location "C:\\VocabDataset" ;
+    tdb:unionDefaultGraph true ; # Optional
+    .
+
+# Text index description
+:indexLucene a text:TextIndexLucene ;
+    text:directory <file:Lucene> ;
+    ##text:directory "mem" ;
+    text:entityMap :entMap ;
+    .
+
+# Mapping in the index
+# URI stored in field "uri"
+# rdfs:label is mapped to field "text"
+:entMap a text:EntityMap ;
+    text:entityField      "uri" ;
+    text:defaultField     "text" ;
+    text:map (
+         [ text:field "text" ; text:predicate rdfs:label ]
+         [ text:field "text" ; text:predicate foaf:name ]
+         ) .
+
+:service_text_tdb rdf:type fuseki:Service ;
+    rdfs:label                      "TDB/text service" ;
+    fuseki:name                     "ds" ;
+    fuseki:serviceQuery             "query" ;
+    fuseki:serviceQuery             "sparql" ;
+    fuseki:serviceUpdate            "update" ;
+    fuseki:serviceUpload            "upload" ;
+    fuseki:serviceReadGraphStore    "get" ;
+    fuseki:serviceReadWriteGraphStore    "data" ;
+    fuseki:dataset                  :text_dataset ;
+    .
